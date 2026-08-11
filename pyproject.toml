@@ -1,0 +1,27 @@
+[project]
+name = "softwalrus"
+version = "0.1.0"
+description = "LangGraph-based orchestrator for pipeline agents (architect/design/develop/review/qa)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=0.2.0",
+    "langgraph-checkpoint-sqlite>=2.0.0",
+    "claude-agent-sdk>=0.1.0",
+    "pydantic>=2.0",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.scripts]
+softwalrus = "softwalrus.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/softwalrus"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
