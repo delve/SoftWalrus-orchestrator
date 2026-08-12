@@ -1,0 +1,19 @@
+(SoftWalrus-orchestrator) delve@ravenclaw:~/repos/github/delve/test$ softwalrus run --request 'initial project build'
+INFO:claude_agent_sdk._internal.transport.subprocess_cli:Using bundled Claude Code CLI: /home/delve/repos/github/delve/SoftWalrus-orchestrator/.venv/lib/python3.12/site-packages/claude_agent_sdk/_bundled/claude
+
+Pipeline complete.
+Final state:
+{
+│   'request': 'initial project build',
+│   'layers': {},
+│   'total_cost_usd': 1.4977531499999999,
+│   'architect_result': {
+│   │   'agent': 'architect',
+│   │   'session_id': '4f945764-d9e2-4517-8423-e22387942e7f',
+│   │   'cost_usd': 1.4977531499999999,
+│   │   'success': False,
+│   │   'error': 'architecture.json schema violation: architecture.json missing required field: request_summary',
+│   │   'output_summary': 'invalid layer plan'
+│   }
+}
+(SoftWalrus-orchestrator) delve@ravenclaw:~/repos/github/delve/test$ 
