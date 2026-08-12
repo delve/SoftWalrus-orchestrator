@@ -23,8 +23,10 @@ async def designer_node(state: PipelineState, project_dir: Path) -> dict:
     scope_hint = plan.get("designer_rationale", "")
 
     prompt = (
-        "Produce or update the UI/UX design specification for this request. "
-        "Follow your agent instructions.\n\n"
+        "Session handoff file: `./handoffs/design.md`\n\n"
+        "Produce or update the UI/UX design specification for this request "
+        "at the handoff file above. Use that exact filename; do not invent a "
+        "different one.\n\n"
         f"Request: {request}\n"
         f"Architect's rationale for involving you: {scope_hint}"
     )

@@ -42,23 +42,27 @@ async def developer_node(state: PipelineState, project_dir: Path) -> dict:
 
     if is_fix_pass:
         prompt = (
-            f"Read the review findings for the {layer['name']} at "
-            f"./handoffs/code-review-{prefix}.md.\n\n"
-            "Review open issues in the handoff file and adjust code in the "
-            f"{layer['name']} to correct them, or document your reasons for "
-            "not correcting the finding in the handoff file. Add unit tests "
-            "to cover any additional code created by the changes.\n\n"
-            "Treat the handoff file as a running document for multiple passes, "
-            "updating open issues as necessary."
+            f"Session handoff file: `./handoffs/code-review-{prefix}.md`\n\n"
+            f"Read the review findings for the {layer['name']} in the handoff "
+            f"file above. Review open issues in that file and adjust code in the "
+            f"{layer['name']} to correct them, or document your reasons for not "
+            f"correcting the finding in that same handoff file. Add unit tests "
+            f"to cover any additional code created by the changes.\n\n"
+            f"Treat the handoff file as a running document for multiple passes, "
+            f"updating open issues as necessary. Update ONLY that file "
+            f"(`./handoffs/code-review-{prefix}.md`) for session notes; do not "
+            f"create files with other names."
         )
     else:
         prompt = (
-            f"Implement the {layer['name']} for the current work item.\n\n"
+            f"Session handoff file: `./handoffs/developer-notes-{prefix}.md`\n\n"
+            f"Implement the {layer['name']} for the current work item, then "
+            f"write your session notes to the handoff file above. Use that "
+            f"exact filename; do not invent a different one.\n\n"
             f"Scope for this layer: {layer['scope']}\n\n"
-            "Read the current architecture at ./handoffs/architecture.md and "
-            "the architecture plan at ./handoffs/architecture.json to "
-            "understand context. Write your session notes to "
-            f"./handoffs/developer-notes-{prefix}.md"
+            f"Read the current architecture at ./handoffs/architecture.md and "
+            f"the architecture plan at ./handoffs/architecture.json to "
+            f"understand context."
         )
 
     result = await run_agent(

@@ -14,10 +14,12 @@ logger = logging.getLogger(__name__)
 
 async def qa_node(state: PipelineState, project_dir: Path) -> dict:
     prompt = (
-        "Verify the application. Build the project, run all existing tests, "
-        "write additional unit tests to fill coverage gaps, write integration "
-        "tests for layer interactions, and produce a full QA report at "
-        "./handoffs/qa-report.md."
+        "Session handoff file: `./handoffs/qa-report.md`\n\n"
+        "Verify the application and produce your full QA report at the handoff "
+        "file above. Use that exact filename; do not invent a different one.\n\n"
+        "Build the project, run all existing tests, write additional unit tests "
+        "to fill coverage gaps, and write integration tests for layer "
+        "interactions."
     )
 
     result = await run_agent(

@@ -60,15 +60,19 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
         }
 
     prompt = (
-        "Review the most recent developer session.\n\n"
-        f"Developer session notes are at ./handoffs/developer-notes-{prefix}.md\n\n"
-        "Report findings in the handoff file. When a finding is resolved, "
-        "update the issue state in the handoff. If there is a regression, "
-        "update the existing issue state to `Open` and add a regression note "
-        "in the summary rather than adding a new issue.\n\n"
-        "Treat the handoff file as a running document for multiple passes, "
-        "appending new findings and updating previous findings as necessary.\n"
-        f"./handoffs/code-review-{prefix}.md"
+        f"Session handoff file: `./handoffs/code-review-{prefix}.md`\n\n"
+        f"Review the most recent developer session for the {layer['name']}, "
+        f"then report findings in the handoff file above. Use that exact "
+        f"filename; do not invent a different one.\n\n"
+        f"Developer session notes are at "
+        f"`./handoffs/developer-notes-{prefix}.md`. Read those before "
+        f"beginning the review.\n\n"
+        f"When a finding is resolved, update the issue state in the handoff. "
+        f"If there is a regression, update the existing issue state to `Open` "
+        f"and add a regression note in the summary rather than adding a new "
+        f"issue. Treat the handoff file as a running document for multiple "
+        f"passes, appending new findings and updating previous findings as "
+        f"necessary."
     )
 
     result = await run_agent(

@@ -99,10 +99,14 @@ async def architect_node(state: PipelineState, project_dir: Path) -> dict:
         }
 
     prompt = (
-        "Evaluate the following user request against the project. Follow "
-        "your agent instructions to detect cold-start vs incremental mode, "
-        "update architecture.md if warranted, and produce architecture.json "
-        "with the layer plan.\n\n"
+        "Session output files:\n"
+        "  - `./handoffs/architecture.md` (architecture document — write or "
+        "update if warranted)\n"
+        "  - `./handoffs/architecture.json` (layer plan — always required, "
+        "must be valid JSON)\n\n"
+        "Evaluate the following user request against the project. Follow your "
+        "agent instructions to detect cold-start vs incremental mode. Use the "
+        "exact filenames above; do not invent different ones.\n\n"
         f"Request: {request}"
     )
 
