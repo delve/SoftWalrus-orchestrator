@@ -1,0 +1,81 @@
+$ softwalrus status
+Next node(s):
+('designer_gate_noop',)
+State values:
+{
+│   'request': 'initial project build',
+│   'plan': {
+│   │   'request_summary': 'Initial project build',
+│   │   'architecture_updated': True,
+│   │   'architecture_change_summary': 'Created architecture.md from scratch: single-module MVVM/Clean layering, Hilt DI, versioned Room schema (nutrition plan history, food cache, recipes/ingredients, log entries), USDA FDC + Open Food Facts integration with 30-day fallback-capable caching, build-time USDA key storage, ML Kit barcode scanning, Compose Navigation screen inventory, rolling-summary window resolution, and display-only rounding rules.',
+│   │   'designer_needed': True,
+│   │   'designer_rationale': 'This is the initial build with a full screen inventory and navigation structure yet to be designed; the Designer must produce layouts, navigation flows, and interaction details before UI development can start.',
+│   │   'layers': [
+│   │   │   {
+│   │   │   │   'id': 'data',
+│   │   │   │   'name': 'data layer',
+│   │   │   │   'scope': 'Set up Room database (entities: NutritionPlanEntity, FoodCacheEntity, RecipeEntity, RecipeIngredientEntity, LogEntryEntity; DAOs and key queries per architecture.md §3) with an initial Migration-based version scheme. Implement Retrofit clients for USDA FDC and Open Food Facts (services, DTOs, kotlinx.serialization, OkHttp interceptors for the USDA API key and OFF User-Agent) per §5.1-5.2. Implement repository interfaces/implementations (NutritionPlanRepository, FoodLookupRepository, RecipeRepository, LogRepository) per §4, including the cache-first/fallback lookup strategy in §5.3. Implement LogRetentionWorker and CacheCleanupWorker (WorkManager) per §7. Wire BuildConfig-based USDA key injection per §6. Set up Hilt modules for the data layer.',
+│   │   │   │   'handoff_prefix': '01-data',
+│   │   │   │   'depends_on': []
+│   │   │   },
+│   │   │   {
+│   │   │   │   'id': 'domain',
+│   │   │   │   'name': 'domain layer',
+│   │   │   │   'scope': 'Implement domain models (source-agnostic FoodLookupResult, NutritionPlan, Recipe, LogEntry) and use cases: ResolveActivePlan/plan resolution helpers, ScaleNutritionToWeight, ResolveSummaryWindow and ComputeRollingSummary (20:00 cutoff logic per §10, including per-day plan-version resolution for the target side), ComputeDailyProgress, and NutritionFormatter for display-only rounding (whole kcal, nearest 0.5g macros) per §11. All pure Kotlin, unit tested, no Android/Room/Retrofit dependencies. Depends on repository interfaces defined for the data layer.',
+│   │   │   │   'handoff_prefix': '02-domain',
+│   │   │   │   'depends_on': ['data']
+│   │   │   },
+│   │   │   {
+│   │   │   │   'id': 'ui',
+│   │   │   │   'name': 'ui layer',
+│   │   │   │   'scope': 'Implement Compose Navigation graph and all screens per architecture.md §9.2: Daily Progress, Add Log Entry source picker, Food Search Results (USDA/OFF), Barcode Scanner (CameraX + ML Kit bundled model per §8), Food Detail/Weight Entry, Manual Entry, Log From Recipe, Log Entry Validation Summary, Recipes List, Recipe Create/Edit with in-place ingredient Edit dialog and live running totals, Summaries (7-day/28-day tabs, refresh-on-navigation), Settings with nutrition plan form (kcal>0, macros>=0 validation). ViewModels backed by the domain/data layers via Hilt. UK formatting conventions and NutritionFormatter used throughout for all displayed values.',
+│   │   │   │   'handoff_prefix': '03-ui',
+│   │   │   │   'depends_on': ['domain']
+│   │   │   }
+│   │   ]
+│   },
+│   'layers': {
+│   │   'data': {
+│   │   │   'id': 'data',
+│   │   │   'name': 'data layer',
+│   │   │   'handoff_prefix': '01-data',
+│   │   │   'scope': 'Set up Room database (entities: NutritionPlanEntity, FoodCacheEntity, RecipeEntity, RecipeIngredientEntity, LogEntryEntity; DAOs and key queries per architecture.md §3) with an initial Migration-based version scheme. Implement Retrofit clients for USDA FDC and Open Food Facts (services, DTOs, kotlinx.serialization, OkHttp interceptors for the USDA API key and OFF User-Agent) per §5.1-5.2. Implement repository interfaces/implementations (NutritionPlanRepository, FoodLookupRepository, RecipeRepository, LogRepository) per §4, including the cache-first/fallback lookup strategy in §5.3. Implement LogRetentionWorker and CacheCleanupWorker (WorkManager) per §7. Wire BuildConfig-based USDA key injection per §6. Set up Hilt modules for the data layer.',
+│   │   │   'status': 'pending',
+│   │   │   'rounds': 0,
+│   │   │   'regression_counts': {},
+│   │   │   'finding_state_history': {},
+│   │   │   'cost_usd': 0.0
+│   │   },
+│   │   'domain': {
+│   │   │   'id': 'domain',
+│   │   │   'name': 'domain layer',
+│   │   │   'handoff_prefix': '02-domain',
+│   │   │   'scope': 'Implement domain models (source-agnostic FoodLookupResult, NutritionPlan, Recipe, LogEntry) and use cases: ResolveActivePlan/plan resolution helpers, ScaleNutritionToWeight, ResolveSummaryWindow and ComputeRollingSummary (20:00 cutoff logic per §10, including per-day plan-version resolution for the target side), ComputeDailyProgress, and NutritionFormatter for display-only rounding (whole kcal, nearest 0.5g macros) per §11. All pure Kotlin, unit tested, no Android/Room/Retrofit dependencies. Depends on repository interfaces defined for the data layer.',
+│   │   │   'status': 'pending',
+│   │   │   'rounds': 0,
+│   │   │   'regression_counts': {},
+│   │   │   'finding_state_history': {},
+│   │   │   'cost_usd': 0.0
+│   │   },
+│   │   'ui': {
+│   │   │   'id': 'ui',
+│   │   │   'name': 'ui layer',
+│   │   │   'handoff_prefix': '03-ui',
+│   │   │   'scope': 'Implement Compose Navigation graph and all screens per architecture.md §9.2: Daily Progress, Add Log Entry source picker, Food Search Results (USDA/OFF), Barcode Scanner (CameraX + ML Kit bundled model per §8), Food Detail/Weight Entry, Manual Entry, Log From Recipe, Log Entry Validation Summary, Recipes List, Recipe Create/Edit with in-place ingredient Edit dialog and live running totals, Summaries (7-day/28-day tabs, refresh-on-navigation), Settings with nutrition plan form (kcal>0, macros>=0 validation). ViewModels backed by the domain/data layers via Hilt. UK formatting conventions and NutritionFormatter used throughout for all displayed values.',
+│   │   │   'status': 'pending',
+│   │   │   'rounds': 0,
+│   │   │   'regression_counts': {},
+│   │   │   'finding_state_history': {},
+│   │   │   'cost_usd': 0.0
+│   │   }
+│   },
+│   'total_cost_usd': 0.6410700000000001,
+│   'architect_result': {
+│   │   'agent': 'architect',
+│   │   'session_id': '91a5c1ea-c3e3-4f9a-b395-c7940cc9b3f3',
+│   │   'cost_usd': 0.6410700000000001,
+│   │   'success': True,
+│   │   'error': None,
+│   │   'output_summary': 'plan: 3 layer(s), designer_needed=True, architecture_updated=True'
+│   }
+}
