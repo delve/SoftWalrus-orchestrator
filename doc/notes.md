@@ -8,4 +8,4 @@
 
 # Notes
 Current testing prompt
-`softwalrus run --request "In the Log Food flow move the quick select button for 100% to the beginning of the list, and let the list wrap instead of scrolling.`
+`softwalrus run --request "In the Log Food flow move the quick select button for 100% to the beginning of the list, and let the list wrap instead of scrolling."`
