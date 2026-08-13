@@ -1,5 +1,9 @@
 # ToDo
 * Reviewer is NOT following the output script, it's making shit up. Is this prompt instruction that needs to move to definition?
+* update developer to not leave review references in code comments
+* ensure developer and code reviewer are collaborating effectively
+* update code reviewer to ONLY produce the findings report. it is currently EXTREMELY verbose for no reason or value
+
 * separate handoff files from long term documentation
 * * JSON output files are handoffs. `architecture.md` and `design.md` are long term documentation
 * * handoff files should not be versioned. move under `.orchestration/`?
