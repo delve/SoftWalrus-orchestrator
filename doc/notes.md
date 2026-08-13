@@ -5,6 +5,7 @@
 * * handoff files should not be versioned. move under `.orchestration/`?
 * Consider having review spawn a new developer for each finding for better focus, more similar to a human team too
 * remove the interrupt after review, make it contingent on round count (tunable)
+* fix the makefile
 
 # Notes
 Current testing prompt
