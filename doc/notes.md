@@ -10,3 +10,13 @@
 # Notes
 Current testing prompt
 `softwalrus run --request "In the Log Food flow move the quick select button for 100% to the beginning of the list, and let the list wrap instead of scrolling."`
+
+# Things to build
+* A realtime Claude usage/session display for Ubuntu, so I don't have to set manual timers or check the page all the time
+* * desktop display
+* * android app with alerts
+* * Store API keys locally? Use existing claude auth?
+
+* Reimplement TabsOutliner in my own repo for control, bug fixing, and personal corpo use
+
+* Reimplement Beyondpod. Because it sucks it was removed and everything else is SHITE.
