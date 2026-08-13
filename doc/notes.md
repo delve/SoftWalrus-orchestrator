@@ -1,0 +1,11 @@
+# ToDo
+* Reviewer is NOT following the output script, it's making shit up. Is this prompt instruction that needs to move to definition?
+* separate handoff files from long term documentation
+* * JSON output files are handoffs. `architecture.md` and `design.md` are long term documentation
+* * handoff files should not be versioned. move under `.orchestration/`?
+* Consider having review spawn a new developer for each finding for better focus, more similar to a human team too
+* remove the interrupt after review, make it contingent on round count (tunable)
+
+# Notes
+Current testing prompt
+`softwalrus run --request "In the Log Food flow move the quick select button for 100% to the beginning of the list, and let the list wrap instead of scrolling.`
