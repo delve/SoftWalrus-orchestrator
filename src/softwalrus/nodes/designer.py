@@ -1,9 +1,4 @@
-"""Designer node.
-
-Simple invocation of the designer sub-agent. The architect has already
-decided whether we need to run at all -- this node runs only when routed
-to.
-"""
+"""Designer node — thin wrapper over the design slash command."""
 
 from __future__ import annotations
 
@@ -11,6 +6,7 @@ import logging
 from pathlib import Path
 
 from ..claude import run_agent
+from ..commands import render_command
 from ..handoffs import design_md_path
 from ..state import NodeResult, PipelineState
 
@@ -22,12 +18,10 @@ async def designer_node(state: PipelineState, project_dir: Path) -> dict:
     plan = state.get("plan", {})
     scope_hint = plan.get("designer_rationale", "")
 
+    template = render_command(project_dir, "design", arguments=[])
     prompt = (
-        "Session handoff file: `./handoffs/design.md`\n\n"
-        "Produce or update the UI/UX design specification for this request "
-        "at the handoff file above. Use that exact filename; do not invent a "
-        "different one.\n\n"
-        f"Request: {request}\n"
+        f"{template}\n\n"
+        f"User request for this run: {request}\n"
         f"Architect's rationale for involving you: {scope_hint}"
     )
 

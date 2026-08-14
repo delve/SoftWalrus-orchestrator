@@ -1,17 +1,7 @@
 """Architect node.
 
-Invokes the architect sub-agent, then reads and validates the resulting
-architecture.json. The architect must always emit this file (both
-cold-start and incremental modes).
-
-Failure modes handled:
-- Agent invocation itself fails (SDK error, timeout, etc.).
-- Agent succeeded but architecture.json is missing.
-- architecture.json is present but not valid JSON.
-- architecture.json is valid JSON but doesn't match the expected schema.
-
-All of these produce a NodeResult with success=False and an error string.
-Downstream routing checks for success before proceeding.
+Reads .claude/commands/pipeline/architect.md from the target project and
+appends the user request. All prompt content lives in the target project.
 """
 
 from __future__ import annotations
@@ -21,22 +11,16 @@ import logging
 from pathlib import Path
 
 from ..claude import run_agent
+from ..commands import render_command
 from ..handoffs import architecture_json_path
 from ..state import LayerPlan, LayerSpec, NodeResult, PipelineState
 
 logger = logging.getLogger(__name__)
 
-
 VALID_LAYER_IDS = {"data", "domain", "ui"}
 
 
 def _validate_plan(raw: dict) -> tuple[bool, str, LayerPlan]:
-    """Return (ok, error_message, plan). If ok is False, plan is a partial value.
-
-    Kept intentionally strict: any deviation from the documented schema
-    fails validation. Downstream code should not have to defend against
-    weird shapes.
-    """
     required_top = ["request_summary", "architecture_updated",
                     "architecture_change_summary", "designer_needed",
                     "designer_rationale", "layers"]
@@ -98,17 +82,10 @@ async def architect_node(state: PipelineState, project_dir: Path) -> dict:
             ),
         }
 
-    prompt = (
-        "Session output files:\n"
-        "  - `./handoffs/architecture.md` (architecture document — write or "
-        "update if warranted)\n"
-        "  - `./handoffs/architecture.json` (layer plan — always required, "
-        "must be valid JSON)\n\n"
-        "Evaluate the following user request against the project. Follow your "
-        "agent instructions to detect cold-start vs incremental mode. Use the "
-        "exact filenames above; do not invent different ones.\n\n"
-        f"Request: {request}"
-    )
+    # architect.md takes no arguments today. We append the user request as
+    # context since the target's slash command doesn't know about it.
+    template = render_command(project_dir, "architect", arguments=[])
+    prompt = f"{template}\n\nUser request for this run: {request}"
 
     result = await run_agent(
         prompt=prompt,
@@ -133,7 +110,6 @@ async def architect_node(state: PipelineState, project_dir: Path) -> dict:
             "total_cost_usd": state.get("total_cost_usd", 0.0) + total_cost_delta,
         }
 
-    # Read architecture.json
     plan_path = architecture_json_path(project_dir)
     if not plan_path.exists():
         node_result["success"] = False
@@ -165,7 +141,6 @@ async def architect_node(state: PipelineState, project_dir: Path) -> dict:
             "total_cost_usd": state.get("total_cost_usd", 0.0) + total_cost_delta,
         }
 
-    # Initialize per-layer state from the plan
     layers_status = {
         spec["id"]: {
             "id": spec["id"],

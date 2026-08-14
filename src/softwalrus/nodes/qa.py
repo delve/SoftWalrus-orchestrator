@@ -1,4 +1,4 @@
-"""QA node — final pass after all layers converge."""
+"""QA node — dispatches the test slash command."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from ..claude import run_agent
+from ..commands import render_command
 from ..handoffs import qa_report_path
 from ..state import NodeResult, PipelineState
 
@@ -13,14 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def qa_node(state: PipelineState, project_dir: Path) -> dict:
-    prompt = (
-        "Session handoff file: `./handoffs/qa-report.md`\n\n"
-        "Verify the application and produce your full QA report at the handoff "
-        "file above. Use that exact filename; do not invent a different one.\n\n"
-        "Build the project, run all existing tests, write additional unit tests "
-        "to fill coverage gaps, and write integration tests for layer "
-        "interactions."
-    )
+    prompt = render_command(project_dir, "test", arguments=[])
 
     result = await run_agent(
         prompt=prompt,

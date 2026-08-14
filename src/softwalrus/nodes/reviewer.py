@@ -1,11 +1,8 @@
 """Reviewer node.
 
-Runs the code-reviewer sub-agent for the current layer, then reads the
-review handoff to detect convergence and regressions. Updates the
-layer status based on what it finds.
-
-Fresh session per round (session reuse was removed in the old orchestrator
-after we discovered per-round cost was compounding).
+Dispatches the codereview slash command with the layer's handoff_prefix
+as $ARGUMENTS[0]. Reads the resulting handoff file for convergence and
+regression detection.
 """
 
 from __future__ import annotations
@@ -15,6 +12,7 @@ import logging
 from pathlib import Path
 
 from ..claude import run_agent
+from ..commands import render_command
 from ..handoffs import (
     code_review_path,
     detect_regression,
@@ -25,7 +23,6 @@ from ..state import NodeResult, PipelineState
 
 logger = logging.getLogger(__name__)
 
-# Hard cap to prevent runaway review loops. Overridable later via config.
 MAX_REVIEW_ROUNDS = 8
 
 
@@ -41,10 +38,8 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
             ),
         }
     layer = layers[layer_id]
-    prefix = layer["handoff_prefix"]
     prior_rounds = layer.get("rounds", 0)
 
-    # Prevent runaway
     if prior_rounds >= MAX_REVIEW_ROUNDS:
         new_layer = copy.deepcopy(layer)
         new_layer["status"] = "halted"
@@ -59,21 +54,7 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
             ),
         }
 
-    prompt = (
-        f"Session handoff file: `./handoffs/code-review-{prefix}.md`\n\n"
-        f"Review the most recent developer session for the {layer['name']}, "
-        f"then report findings in the handoff file above. Use that exact "
-        f"filename; do not invent a different one.\n\n"
-        f"Developer session notes are at "
-        f"`./handoffs/developer-notes-{prefix}.md`. Read those before "
-        f"beginning the review.\n\n"
-        f"When a finding is resolved, update the issue state in the handoff. "
-        f"If there is a regression, update the existing issue state to `Open` "
-        f"and add a regression note in the summary rather than adding a new "
-        f"issue. Treat the handoff file as a running document for multiple "
-        f"passes, appending new findings and updating previous findings as "
-        f"necessary."
-    )
+    prompt = render_command(project_dir, "codereview", arguments=[layer["handoff_prefix"]])
 
     result = await run_agent(
         prompt=prompt,
@@ -105,7 +86,7 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
             "total_cost_usd": state.get("total_cost_usd", 0.0) + result.total_cost_usd,
         }
 
-    review_path = code_review_path(project_dir, prefix)
+    review_path = code_review_path(project_dir, layer["handoff_prefix"])
     if not review_path.exists():
         node_result["success"] = False
         node_result["error"] = f"agent reported success but {review_path.name} is missing"
@@ -130,7 +111,6 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
                     f"({len(findings)} findings terminal)"
                 )
             else:
-                # Detect stall via regression tracking
                 regression_counts = dict(new_layer.get("regression_counts", {}))
                 history = dict(new_layer.get("finding_state_history", {}))
                 stalled_id = detect_regression(findings, history, regression_counts)
@@ -146,7 +126,6 @@ async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
                         f"round {new_layer['rounds']}: STALLED on {stalled_id}"
                     )
                 else:
-                    # Not converged, not stalled -> fix pass next
                     new_layer["status"] = "fixing"
                     node_result["output_summary"] = (
                         f"round {new_layer['rounds']}: {open_count} Open, "

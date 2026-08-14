@@ -1,12 +1,7 @@
 """Developer node.
 
-Handles both the initial develop pass for a layer and subsequent fix
-passes for the same layer. The differentiator is layer.status:
-- 'pending' or 'developing' -> initial develop pass
-- 'fixing' -> fix pass against review findings
-
-The layer being processed is read from state.current_layer_id and the
-detail from state.layers[current_layer_id].
+Dispatches the develop or fix slash command with the layer's handoff_prefix
+as $ARGUMENTS[0].
 """
 
 from __future__ import annotations
@@ -16,10 +11,8 @@ import logging
 from pathlib import Path
 
 from ..claude import run_agent
-from ..handoffs import (
-    code_review_path,
-    developer_notes_path,
-)
+from ..commands import render_command
+from ..handoffs import developer_notes_path
 from ..state import NodeResult, PipelineState
 
 logger = logging.getLogger(__name__)
@@ -37,33 +30,10 @@ async def developer_node(state: PipelineState, project_dir: Path) -> dict:
             ),
         }
     layer = layers[layer_id]
-    prefix = layer["handoff_prefix"]
     is_fix_pass = layer.get("status") == "fixing"
 
-    if is_fix_pass:
-        prompt = (
-            f"Session handoff file: `./handoffs/code-review-{prefix}.md`\n\n"
-            f"Read the review findings for the {layer['name']} in the handoff "
-            f"file above. Review open issues in that file and adjust code in the "
-            f"{layer['name']} to correct them, or document your reasons for not "
-            f"correcting the finding in that same handoff file. Add unit tests "
-            f"to cover any additional code created by the changes.\n\n"
-            f"Treat the handoff file as a running document for multiple passes, "
-            f"updating open issues as necessary. Update ONLY that file "
-            f"(`./handoffs/code-review-{prefix}.md`) for session notes; do not "
-            f"create files with other names."
-        )
-    else:
-        prompt = (
-            f"Session handoff file: `./handoffs/developer-notes-{prefix}.md`\n\n"
-            f"Implement the {layer['name']} for the current work item, then "
-            f"write your session notes to the handoff file above. Use that "
-            f"exact filename; do not invent a different one.\n\n"
-            f"Scope for this layer: {layer['scope']}\n\n"
-            f"Read the current architecture at ./handoffs/architecture.md and "
-            f"the architecture plan at ./handoffs/architecture.json to "
-            f"understand context."
-        )
+    command_name = "fix" if is_fix_pass else "develop"
+    prompt = render_command(project_dir, command_name, arguments=[layer["handoff_prefix"]])
 
     result = await run_agent(
         prompt=prompt,
@@ -71,7 +41,6 @@ async def developer_node(state: PipelineState, project_dir: Path) -> dict:
         agent_name="developer",
     )
 
-    # Build updated layer status
     new_layer = copy.deepcopy(layer)
     new_layer["cost_usd"] = new_layer.get("cost_usd", 0.0) + result.total_cost_usd
 
@@ -89,13 +58,9 @@ async def developer_node(state: PipelineState, project_dir: Path) -> dict:
         new_layer["status"] = "halted"
     else:
         if is_fix_pass:
-            # Fix pass done; the review handoff should already exist. Nothing
-            # to verify on disk beyond what the review node will check next.
             node_result["output_summary"] = f"fix pass complete for {layer['name']}"
-            # status transitions to 'reviewing' happen when the review node runs
         else:
-            # Initial develop pass; verify the notes file was written.
-            notes = developer_notes_path(project_dir, prefix)
+            notes = developer_notes_path(project_dir, layer["handoff_prefix"])
             if not notes.exists() or notes.stat().st_size == 0:
                 node_result["success"] = False
                 node_result["error"] = (
@@ -105,7 +70,6 @@ async def developer_node(state: PipelineState, project_dir: Path) -> dict:
                 new_layer["status"] = "halted"
             else:
                 node_result["output_summary"] = f"develop pass complete for {layer['name']}"
-                # status transitions to 'reviewing' happen when the review node runs
 
     new_layers = dict(layers)
     new_layers[layer_id] = new_layer
