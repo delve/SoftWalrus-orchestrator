@@ -1,6 +1,5 @@
 # ToDo
 * update all agents to emit JSON output as well as MD.
-* Fix convergence: statuses don't match preventing convergence. Contract between SW and target: reviewer emits strict JSON with total issue count, count of 'open', count of 'closed'. target project solely responsible for defining acceptable ticket states and mapping to open/closed. SW validates JSON for structure and open+fixed=total.
 * update developer to not leave review references in code comments
 * ensure developer and code reviewer are collaborating effectively
 * update code reviewer to ONLY produce the findings report. it is currently EXTREMELY verbose for no reason or value

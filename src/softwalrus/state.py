@@ -1,20 +1,8 @@
 """Graph state model.
 
-Phase 2: request -> architect -> (optional designer) -> per-layer
-develop/review loop -> qa. The state tracks a layer plan produced by the
-architect and per-layer status as the pipeline progresses.
-
-Design notes:
-- All non-primitive fields are declared with total=False so partial
-  updates from nodes merge cleanly without requiring every node to
-  return the full state.
-- `layers` is a dict keyed by layer id (from the architect's plan) so
-  updates to a single layer's status don't require rewriting the whole
-  list. LangGraph's default reducer replaces dict values wholesale;
-  we handle merges explicitly in nodes.
-- `NodeResult` retains the minimal breadcrumb shape from Phase 1. The
-  transcript files hold the full detail; the state holds just enough
-  to render `softwalrus status` usefully.
+The state tracks the layer plan produced by the architect and per-layer
+status as the pipeline progresses. Per-invocation `artifacts` blobs are
+appended to a running list keyed by node kind + layer id + round.
 """
 
 from __future__ import annotations
@@ -23,19 +11,17 @@ from typing import Optional
 from typing_extensions import TypedDict
 
 
-# ---------- Sub-shapes ----------
-
 class LayerSpec(TypedDict):
     """One layer as declared in the architect's plan."""
-    id: str                     # "data", "domain", "ui"
-    name: str                   # "data layer"
-    scope: str                  # what the developer should build
-    handoff_prefix: str         # e.g. "01-data" -- used for filenames
-    depends_on: list[str]       # layer ids this layer depends on
+    id: str
+    name: str
+    scope: str
+    handoff_prefix: str
+    depends_on: list[str]
 
 
 class LayerPlan(TypedDict, total=False):
-    """Full architect output -- the parsed architecture.json."""
+    """Full architect output -- the parsed architecture.json artifacts."""
     request_summary: str
     architecture_updated: bool
     architecture_change_summary: str
@@ -45,13 +31,14 @@ class LayerPlan(TypedDict, total=False):
 
 
 class NodeResult(TypedDict, total=False):
-    """Result payload from a single node invocation."""
+    """Short breadcrumb for `softwalrus status`. Full detail is in
+    persisted_artifacts and in the on-disk JSON files."""
     agent: str
     session_id: Optional[str]
     cost_usd: float
     success: bool
-    error: Optional[str]
-    output_summary: str
+    error: Optional[str]         # halt message SoftWalrus surfaced (node error or SoftWalrus-authored)
+    output_summary: str          # human-readable summary lifted from artifacts / envelope message
 
 
 class LayerStatus(TypedDict, total=False):
@@ -60,14 +47,21 @@ class LayerStatus(TypedDict, total=False):
     name: str
     handoff_prefix: str
     scope: str
-    status: str                 # 'pending', 'developing', 'reviewing', 'fixing', 'converged', 'halted', 'skipped'
-    rounds: int                 # completed review rounds
-    regression_counts: dict[str, int]  # finding id -> Fixed->Open transition count
-    finding_state_history: dict[str, str]  # finding id -> last seen state
+    status: str                  # 'pending', 'developing', 'reviewing', 'fixing', 'converged', 'halted', 'skipped'
+    rounds: int
     cost_usd: float
 
 
-# ---------- Top-level state ----------
+class InvocationRecord(TypedDict):
+    """Persisted record of one node invocation. Written to state on every call."""
+    node: str                    # 'architect', 'designer', 'developer', 'reviewer', 'qa'
+    layer_id: Optional[str]      # None for architect/designer/qa
+    round: int                   # 0 for non-loop nodes; 1..N for review rounds; matched fix passes share the round number
+    ok: bool
+    artifacts: dict              # full artifacts blob from the node's JSON envelope (empty on failure)
+    envelope_message: str        # envelope.message from the node
+    halt_message: Optional[str]  # populated when ok=False
+
 
 class PipelineState(TypedDict, total=False):
     """LangGraph state for the whole pipeline."""
@@ -75,7 +69,7 @@ class PipelineState(TypedDict, total=False):
     # User input
     request: str
 
-    # Architect output (parsed from architecture.json)
+    # Architect output (parsed from architect.json artifacts)
     plan: LayerPlan
 
     # Per-layer status keyed by layer id
@@ -87,10 +81,11 @@ class PipelineState(TypedDict, total=False):
     # Rolling totals
     total_cost_usd: float
 
-    # Phase results (one per phase; nodes overwrite as they run)
+    # History of every node invocation this run. Appended to by nodes.
+    invocations: list[InvocationRecord]
+
+    # Phase-level breadcrumbs (last invocation of each phase)
     architect_result: NodeResult
     designer_result: NodeResult
     qa_result: NodeResult
-
-    # Last develop/review/fix result (per-layer detail is in `layers`)
     last_result: NodeResult

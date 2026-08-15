@@ -1,142 +1,125 @@
 """Reviewer node.
 
-Dispatches the codereview slash command with the layer's handoff_prefix
-as $ARGUMENTS[0]. Reads the resulting handoff file for convergence and
-regression detection.
+Reads artifacts.findings from the reviewer's JSON to determine convergence
+and to apply SoftWalrus-imposed halt policies:
+
+  - Convergence: findings.open == 0 -> layer status becomes 'converged'.
+  - Regression threshold: findings.regressionCount (if present) >= 6 -> halt
+    with SoftWalrus-authored message.
+  - Max rounds: rounds > MAX_REVIEW_ROUNDS -> halt with SoftWalrus-authored
+    message.
+
+Everything else in the reviewer's artifacts is opaque to SoftWalrus and
+gets persisted verbatim as an InvocationRecord.
 """
 
 from __future__ import annotations
 
 import copy
-import logging
 from pathlib import Path
 
-from ..claude import run_agent
-from ..commands import render_command
-from ..handoffs import (
-    code_review_path,
-    detect_regression,
-    is_converged,
-    parse_findings,
-)
-from ..state import NodeResult, PipelineState
-
-logger = logging.getLogger(__name__)
+from ..handoffs import code_review_json_path
+from ..state import PipelineState
+from ._common import invoke_and_validate
 
 MAX_REVIEW_ROUNDS = 8
+REGRESSION_THRESHOLD = 6
 
 
 async def reviewer_node(state: PipelineState, project_dir: Path) -> dict:
     layer_id = state.get("current_layer_id")
     layers = state.get("layers", {})
+
     if not layer_id or layer_id not in layers:
+        halt = f"reviewer called with unknown current_layer_id={layer_id!r}"
         return {
-            "last_result": NodeResult(
-                agent="code-reviewer", success=False,
-                error=f"current_layer_id {layer_id!r} not found in state.layers",
-                output_summary="misrouted reviewer call", cost_usd=0.0, session_id=None,
-            ),
+            "last_result": {
+                "agent": "code-reviewer", "success": False,
+                "error": halt, "output_summary": halt,
+                "cost_usd": 0.0, "session_id": None,
+            },
         }
+
     layer = layers[layer_id]
+    prefix = layer["handoff_prefix"]
     prior_rounds = layer.get("rounds", 0)
 
+    # Max rounds check happens BEFORE invocation so we don't burn tokens on a
+    # round we've decided to reject anyway.
     if prior_rounds >= MAX_REVIEW_ROUNDS:
+        halt_msg = f"Max review rounds reached ({MAX_REVIEW_ROUNDS})"
         new_layer = copy.deepcopy(layer)
         new_layer["status"] = "halted"
         new_layers = dict(layers)
         new_layers[layer_id] = new_layer
         return {
             "layers": new_layers,
-            "last_result": NodeResult(
-                agent="code-reviewer", success=False,
-                error=f"max review rounds ({MAX_REVIEW_ROUNDS}) reached",
-                output_summary="halted: max rounds", cost_usd=0.0, session_id=None,
-            ),
+            "last_result": {
+                "agent": "code-reviewer", "success": False,
+                "error": halt_msg, "output_summary": halt_msg,
+                "cost_usd": 0.0, "session_id": None,
+            },
         }
 
-    prompt = render_command(project_dir, "codereview", arguments=[layer["handoff_prefix"]])
-
-    result = await run_agent(
-        prompt=prompt,
+    outcome = await invoke_and_validate(
         project_dir=project_dir,
+        node_kind="reviewer",
+        layer_id=layer_id,
+        round_number=prior_rounds + 1,
         agent_name="code-reviewer",
+        command_name="codereview",
+        command_arguments=[prefix],
+        output_path=code_review_json_path(project_dir, prefix),
     )
 
     new_layer = copy.deepcopy(layer)
-    new_layer["cost_usd"] = new_layer.get("cost_usd", 0.0) + result.total_cost_usd
+    new_layer["cost_usd"] = new_layer.get("cost_usd", 0.0) + outcome.claude.total_cost_usd
     new_layer["rounds"] = prior_rounds + 1
 
-    node_result: NodeResult = {
-        "agent": "code-reviewer",
-        "session_id": result.session_id,
-        "cost_usd": result.total_cost_usd,
-        "success": result.success,
-        "error": result.raw_error,
-        "output_summary": "",
-    }
+    node_result = outcome.node_result
+    invocation_record = outcome.invocation_record
 
-    if not result.success:
-        node_result["output_summary"] = f"agent failed: subtype={result.subtype}"
-        new_layer["status"] = "halted"
-        new_layers = dict(layers)
-        new_layers[layer_id] = new_layer
-        return {
-            "layers": new_layers,
-            "last_result": node_result,
-            "total_cost_usd": state.get("total_cost_usd", 0.0) + result.total_cost_usd,
-        }
-
-    review_path = code_review_path(project_dir, layer["handoff_prefix"])
-    if not review_path.exists():
-        node_result["success"] = False
-        node_result["error"] = f"agent reported success but {review_path.name} is missing"
-        node_result["output_summary"] = "missing review handoff"
+    if not outcome.validated.ok:
         new_layer["status"] = "halted"
     else:
-        findings = parse_findings(review_path)
-        if not findings:
-            node_result["success"] = False
-            node_result["error"] = "review handoff contains no parseable findings"
-            node_result["output_summary"] = "no findings parsed"
-            new_layer["status"] = "halted"
-        else:
-            open_count = sum(1 for f in findings if f.state == "Open")
-            fixed_count = sum(1 for f in findings if f.state == "Fixed")
-            terminal_count = len(findings) - open_count - fixed_count
+        findings = outcome.validated.artifacts.get("findings", {})
+        open_count = findings.get("open", 0)
+        regression_count = findings.get("regressionCount")  # may be missing
 
-            if is_converged(findings):
-                new_layer["status"] = "converged"
-                node_result["output_summary"] = (
-                    f"round {new_layer['rounds']}: converged "
-                    f"({len(findings)} findings terminal)"
-                )
-            else:
-                regression_counts = dict(new_layer.get("regression_counts", {}))
-                history = dict(new_layer.get("finding_state_history", {}))
-                stalled_id = detect_regression(findings, history, regression_counts)
-                new_layer["regression_counts"] = regression_counts
-                new_layer["finding_state_history"] = history
-                if stalled_id:
-                    new_layer["status"] = "halted"
-                    node_result["success"] = False
-                    node_result["error"] = (
-                        f"finding {stalled_id} regressed multiple times; stall detected"
-                    )
-                    node_result["output_summary"] = (
-                        f"round {new_layer['rounds']}: STALLED on {stalled_id}"
-                    )
-                else:
-                    new_layer["status"] = "fixing"
-                    node_result["output_summary"] = (
-                        f"round {new_layer['rounds']}: {open_count} Open, "
-                        f"{fixed_count} Fixed, {terminal_count} terminal"
-                    )
+        # Convergence check
+        if open_count == 0:
+            new_layer["status"] = "converged"
+        else:
+            new_layer["status"] = "fixing"
+
+        # SoftWalrus-imposed halt: regressionCount threshold.
+        # This OVERRIDES the fixing status set above; a regression halt trumps
+        # continuing the loop.
+        if regression_count is not None and regression_count >= REGRESSION_THRESHOLD:
+            halt_msg = (
+                f"Regressions exceed threshold "
+                f"({regression_count} >= {REGRESSION_THRESHOLD})"
+            )
+            new_layer["status"] = "halted"
+            # Rewrite the node_result and invocation_record with the
+            # SoftWalrus-authored halt so downstream error surfacing is correct.
+            node_result = dict(node_result)
+            node_result["success"] = False
+            node_result["error"] = halt_msg
+            node_result["output_summary"] = halt_msg
+            invocation_record = dict(invocation_record)
+            invocation_record["ok"] = False
+            invocation_record["halt_message"] = halt_msg
 
     new_layers = dict(layers)
     new_layers[layer_id] = new_layer
 
+    prior_invocations = state.get("invocations", [])
+    prior_cost = state.get("total_cost_usd", 0.0)
+
     return {
         "layers": new_layers,
         "last_result": node_result,
-        "total_cost_usd": state.get("total_cost_usd", 0.0) + result.total_cost_usd,
+        "invocations": prior_invocations + [invocation_record],
+        "total_cost_usd": prior_cost + outcome.claude.total_cost_usd,
     }
