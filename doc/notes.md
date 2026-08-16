@@ -1,15 +1,15 @@
 # ToDo
-* update all agents to emit JSON output as well as MD.
-* update developer to not leave review references in code comments
-* ensure developer and code reviewer are collaborating effectively
-* update code reviewer to ONLY produce the findings report. it is currently EXTREMELY verbose for no reason or value
-
-* separate handoff files from long term documentation
-* * JSON output files are handoffs. `architecture.md` and `design.md` are long term documentation
-* * handoff files should not be versioned. move under `.orchestration/`?
-* Consider having review spawn a new developer for each finding for better focus, more similar to a human team too
+* document contract.
+* separate handoff files from long term documentation EG Code review & dev notes are handoffs. `architecture.md` and `design.md` are long term documentation
+* * Move long term documentation into `docs/`
+* * JSON files are orchstration only and should not be versioned, move to `.orchestration/`
+* * handoff files should not be versioned. move to `agent_handoffs/` for clarity and add folder to gitignore
 * remove the interrupt after review, make it contingent on round count (tunable)
 * fix the makefile
+* parameterize so many things. agent names, how prompts are built from slash commands, graph flow, regression and round count limits
+
+## longer term thoughts
+* Consider having review spawn a new developer for each finding for better focus, more similar to a human team too
 
 # Notes
 Current testing prompt

@@ -28,6 +28,9 @@ pip install -e .
 1. Claude Code CLI installed and authenticated (`claude` runs interactively without prompting for auth). The Agent SDK talks to the same authenticated backend.
 2. Target project has `.claude/agents/developer.md` defined.
 
+## Integration
+Target projects supply their own agent definitions. See `CONTRACT.md` for the contract between SoftWalrus and your project.
+
 ## Usage
 
 From within the target project directory:
